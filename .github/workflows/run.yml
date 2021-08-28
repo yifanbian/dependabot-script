@@ -1,24 +1,36 @@
-name: Run
+name: Build and publish docker image
 
-on: [push, pull_request]
-
+on: 
+  push:
+    branches:
+      - main
+env:
+  IMAGE_NAME: dependabot-script
 jobs:
-  test-run:
-    name: Dependabot ${{ matrix.package_manager }}
+  build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        package_manager: [bundler]
+    permissions:
+      packages: write
+      contents: read
     steps:
       - uses: actions/checkout@v2
-      - name: Prepare environment variables
-        run: echo "IMAGE_NAME=dependabot/dependabot-script" >> $GITHUB_ENV
-      - name: Build Dockerfile
-        run: docker build -t "$IMAGE_NAME" -f Dockerfile .
-      - name: Run ${{ matrix.package_manager }} tests
+      - name: Build image
+        run: docker build -t "$IMAGE_NAME" -f Dockerfile --label "runnumber=${GITHUB_RUN_ID}" .
+      - name: Log into registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Push image
         run: |
-          docker run --rm \
-            --env "GITHUB_ACCESS_TOKEN=${{ secrets.GITHUB_TOKEN }}" \
-            --env "PROJECT_PATH=${{ github.repository }}" \
-            --env "PACKAGE_MANAGER=${{ matrix.package_manager }}" \
-            "$IMAGE_NAME"
+          IMAGE_ID=ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME
+          IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
+          # Strip git ref prefix from version
+          VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
+          # Strip "v" prefix from tag name
+          [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
+          # Use Docker `latest` tag convention
+          [ "$VERSION" == "rust" ] && VERSION=latest
+          echo IMAGE_ID=$IMAGE_ID
+          echo VERSION=$VERSION
+          docker tag $IMAGE_NAME $IMAGE_ID:$VERSION
+          docker push $IMAGE_ID:$VERSION
+          docker tag $IMAGE_NAME $IMAGE_ID:latest
+          docker push $IMAGE_ID:latest
