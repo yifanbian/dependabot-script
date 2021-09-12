@@ -8,6 +8,7 @@ require "dependabot/file_updaters"
 require "dependabot/pull_request_creator"
 require "dependabot/omnibus"
 require "gitlab"
+require "json"
 
 credentials = [
   {
@@ -44,6 +45,12 @@ branch = ENV["BRANCH"]
 # - docker
 # - terraform
 package_manager = ENV["PACKAGE_MANAGER"] || "bundler"
+
+# Add additional credentials from environment variable
+additional_credentials = ENV["ADDITIONAL_CREDENTIALS"]
+additional_credentials = "[]" if additional_credentials.nil? or additional_credentials.blank?
+additional_credentials = JSON.parse(additional_credentials)
+credentials = credentials + additional_credentials
 
 if ENV["GITHUB_ENTERPRISE_ACCESS_TOKEN"]
   credentials << {

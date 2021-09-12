@@ -1,13 +1,12 @@
-FROM dependabot/dependabot-core:0.142.0
+FROM dependabot/dependabot-core:latest
 
-ARG CODE_DIR=/home/dependabot/dependabot-script
-RUN mkdir -p ${CODE_DIR}
-COPY --chown=dependabot:dependabot Gemfile Gemfile.lock ${CODE_DIR}/
+ARG CODE_DIR=/dependabot-script
+USER root
+ENV CODE_DIR ${CODE_DIR}
 WORKDIR ${CODE_DIR}
 
-RUN bundle config set --local path "vendor" \
-  && bundle install --jobs 4 --retry 3
-
 COPY --chown=dependabot:dependabot . ${CODE_DIR}
+RUN bundle config set --local path "vendor" \
+ && bundle install --jobs 4 --retry 3
 
 CMD ["bundle", "exec", "ruby", "./generic-update-script.rb"]
